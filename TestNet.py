@@ -6,8 +6,8 @@ from torchvision.transforms import transforms
 
 import os
 import matplotlib.pyplot as plt
-from LargeKernelClassifierNet import *
-import pandas as pd
+from LightweightClassifierNet import *
+#import pandas as pd
 
 data_dir = 'D:\\实习\\data\\areca_texture'
 

@@ -3,7 +3,7 @@ import json
 from PIL import Image
 from torchvision import transforms
 import matplotlib.pyplot as plt
-from LargeKernelClassifierNet import *
+from LightweightClassifierNet import *
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
     ])
 
     # 加载待预测图片
-    img_path = "E:\\data\\areca_texture\\test\\guanghua\\102737_229.jpg"
+    img_path = ""
     assert os.path.exists(img_path), "file: '{}' dose not exist.".format(img_path)
     img = Image.open(img_path)
     plt.imshow(img)  # 显示原始图片
@@ -45,7 +45,7 @@ def main():
     model = LargeKernelClassifierNet(True).to(device)
 
     # 加载模型权重
-    weights_path = "C:\\Users\\jidan\\Desktop\\model\\TestNet_model.pth"
+    weights_path = ""
     assert os.path.exists(weights_path), "file: '{}' dose not exist.".format(weights_path)
     missing_keys, unexpected_keys = model.load_state_dict(
         torch.load(weights_path, map_location=device),

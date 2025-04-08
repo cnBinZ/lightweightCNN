@@ -3,7 +3,7 @@ import torchvision
 from torchvision.transforms import transforms
 from torchvision import models
 import os
-from LargeKernelClassifierNet import *
+from LightweightClassifierNet import *
 
 
 def test(model, device, test_loader):
@@ -38,7 +38,7 @@ def main():
     主函数：加载数据、初始化模型并进行测试
     """
     # 数据集路径
-    data_dir = 'E:\\data\\areca_texture'
+    data_dir = ''
 
     # 训练数据集
     train_dataset = torchvision.datasets.ImageFolder(
@@ -78,13 +78,13 @@ def main():
 
     # 测试自定义模型
     model_test = LargeKernelClassifierNet(True)
-    model_test.load_state_dict(torch.load("C:\\Users\\jidan\\Desktop\\model\\TestNet_model.pth", map_location=device))
+    model_test.load_state_dict(torch.load("", map_location=device))
     model_test = model_test.to(device)
     test(model_test, device, val_dataloader)
 
     # 测试GoogLeNet模型
     model_googlenet = models.GoogLeNet(num_classes=2, aux_logits=False, init_weights=False)
-    model_googlenet.load_state_dict(torch.load("C:\\Users\\jidan\\Desktop\\model\\GoogLeNet_model.pth", map_location=device))
+    model_googlenet.load_state_dict(torch.load("", map_location=device))
     model_googlenet = model_googlenet.to(device)
     test(model_googlenet, device, val_dataloader)
 
@@ -92,7 +92,7 @@ def main():
     model_resnet = models.resnet18(pretrained=False)
     num_fc_in = model_resnet.fc.in_features
     model_resnet.fc = nn.Linear(num_fc_in, 2)  # 修改最后的全连接层
-    model_resnet.load_state_dict(torch.load("C:\\Users\\jidan\\Desktop\\model\\resnet_model.pth", map_location=device))
+    model_resnet.load_state_dict(torch.load("", map_location=device))
     model_resnet = model_resnet.to(device)
     test(model_resnet, device, val_dataloader)
 
