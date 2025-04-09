@@ -1,9 +1,38 @@
+import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 import torchvision
 from torchvision.transforms import transforms
 from torchvision import models
 import os
-from LightweightClassifierNet import *
+from LightweightClassifierNet import LargeKernelClassifierNet
+from config import *  # 导入配置文件
+
+
+def get_device():
+    """根据配置选择合适的设备"""
+    if DEVICE_CONFIG['use_mps'] and torch.backends.mps.is_available():
+        return torch.device("mps")
+    elif DEVICE_CONFIG['use_cuda'] and torch.cuda.is_available():
+        return torch.device("cuda")
+    elif DEVICE_CONFIG['use_cpu']:
+        return torch.device("cpu")
+    else:
+        raise RuntimeError("No available device found")
+
+
+def get_transforms():
+    """根据配置创建数据转换"""
+    transform = transforms.Compose([
+        transforms.ColorJitter(*TRANSFORM_CONFIG['color_jitter']),
+        transforms.RandomCrop(TRAINING_CONFIG['image_size'], 
+                            padding=TRAINING_CONFIG['padding'], 
+                            fill=TRAINING_CONFIG['fill_color']),
+        transforms.RandomHorizontalFlip() if TRANSFORM_CONFIG['random_horizontal_flip'] else transforms.Lambda(lambda x: x),
+        transforms.RandomVerticalFlip() if TRANSFORM_CONFIG['random_vertical_flip'] else transforms.Lambda(lambda x: x),
+        transforms.ToTensor()
+    ])
+    return transform
 
 
 def test(model, device, test_loader):
@@ -37,63 +66,73 @@ def main():
     """
     主函数：加载数据、初始化模型并进行测试
     """
-    # 数据集路径
-    data_dir = ''
+    # 获取设备
+    device = get_device()
+    print(f'Using device: {device}')
 
-    # 训练数据集
+    # 获取数据转换
+    data_transform = get_transforms()
+    
+    # 加载数据集
     train_dataset = torchvision.datasets.ImageFolder(
-        root=os.path.join(data_dir, 'train'),
-        transform=transforms.Compose([
-            transforms.ColorJitter(0.05, 0.05, 0.05, 0.05),  # 颜色抖动
-            transforms.RandomCrop((128, 256), padding=(8, 8), fill=(255, 255, 255)),  # 随机裁剪
-            transforms.RandomHorizontalFlip(),  # 随机水平翻转
-            transforms.RandomVerticalFlip(),  # 随机垂直翻转
-            transforms.ToTensor()  # 转换为张量
-        ])
+        root=TRAIN_DATA_DIR,
+        transform=data_transform
     )
     
-    # 验证数据集
     val_dataset = torchvision.datasets.ImageFolder(
-        root=os.path.join(data_dir, 'test'),
-        transform=transforms.Compose([
-            transforms.ColorJitter(0.05, 0.05, 0.05, 0.05),  # 颜色抖动
-            transforms.RandomCrop((128, 256), padding=(8, 8), fill=(255, 255, 255)),  # 随机裁剪
-            transforms.RandomHorizontalFlip(),  # 随机水平翻转
-            transforms.RandomVerticalFlip(),  # 随机垂直翻转
-            transforms.ToTensor()  # 转换为张量
-        ])
+        root=VAL_DATA_DIR,
+        transform=data_transform
     )
 
     # 创建数据加载器
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=20, shuffle=4)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=20, shuffle=4)
+    train_dataloader = DataLoader(
+        dataset=train_dataset, 
+        batch_size=TRAINING_CONFIG['batch_size'], 
+        shuffle=True,
+        num_workers=TRAINING_CONFIG['num_workers']
+    )
+    
+    val_dataloader = DataLoader(
+        dataset=val_dataset, 
+        batch_size=TRAINING_CONFIG['batch_size'], 
+        shuffle=True,
+        num_workers=TRAINING_CONFIG['num_workers']
+    )
 
     # 获取类别名称
     class_names = train_dataset.classes
-    print('class_names:{}'.format(class_names))
-
-    # 设置运行设备
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print('device:{}'.format(device.type))
+    print(f'Classes: {class_names}')
 
     # 测试自定义模型
-    model_test = LargeKernelClassifierNet(True)
-    model_test.load_state_dict(torch.load("", map_location=device))
+    model_test = LargeKernelClassifierNet(new_resnet=True)
+    model_test.load_state_dict(torch.load(
+        os.path.join(MODEL_DIR, MODEL_SAVE_CONFIG['best_model_name']), 
+        map_location=device
+    ))
     model_test = model_test.to(device)
+    print("\nTesting LightweightClassifierNet model:")
     test(model_test, device, val_dataloader)
 
     # 测试GoogLeNet模型
-    model_googlenet = models.GoogLeNet(num_classes=2, aux_logits=False, init_weights=False)
-    model_googlenet.load_state_dict(torch.load("", map_location=device))
+    model_googlenet = models.GoogLeNet(num_classes=len(class_names), aux_logits=False, init_weights=False)
+    model_googlenet.load_state_dict(torch.load(
+        os.path.join(MODEL_DIR, "googlenet_model.pth"), 
+        map_location=device
+    ))
     model_googlenet = model_googlenet.to(device)
+    print("\nTesting GoogLeNet model:")
     test(model_googlenet, device, val_dataloader)
 
     # 测试ResNet模型
     model_resnet = models.resnet18(pretrained=False)
     num_fc_in = model_resnet.fc.in_features
-    model_resnet.fc = nn.Linear(num_fc_in, 2)  # 修改最后的全连接层
-    model_resnet.load_state_dict(torch.load("", map_location=device))
+    model_resnet.fc = nn.Linear(num_fc_in, len(class_names))  # 修改最后的全连接层
+    model_resnet.load_state_dict(torch.load(
+        os.path.join(MODEL_DIR, "resnet_model.pth"), 
+        map_location=device
+    ))
     model_resnet = model_resnet.to(device)
+    print("\nTesting ResNet model:")
     test(model_resnet, device, val_dataloader)
 
 

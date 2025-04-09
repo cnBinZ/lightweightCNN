@@ -1,91 +1,123 @@
-# LightweightCNN
+# 轻量级CNN模型训练与测试
 
-这是一个基于PyTorch实现的轻量级卷积神经网络项目，主要用于图像分类任务。该项目实现了一个具有大卷积核的轻量级分类网络，并提供了训练、测试和预测功能。
+本项目实现了一个轻量级的CNN模型，用于图像分类任务。项目包含模型定义、训练、测试和预测等完整功能。
 
 ## 项目结构
 
 ```
-.
-├── LightweightClassifierNet.py  # 主要的网络模型实现
-├── TestNet.py                   # 测试网络实现
-├── test.py                      # 模型测试脚本
-├── predict.py                   # 图像预测脚本
-└── class_indices.json          # 类别索引文件
+lightweightCNN/
+├── config.py           # 配置文件
+├── LightweightClassifierNet.py  # 模型定义
+├── train.py           # 训练脚本
+├── test.py           # 测试脚本
+├── predict.py        # 预测脚本
+├── models/           # 模型保存目录
+└── data/             # 数据集目录
+    ├── train/        # 训练数据
+    └── val/          # 验证数据
 ```
-
-## 主要特性
-
-- 实现了轻量级的卷积神经网络架构
-- 支持大卷积核操作
-- 包含多种残差块设计
-- 提供了完整的训练、测试和预测流程
-- 支持CPU和GPU训练
-
-## 网络架构
-
-该网络包含以下主要组件：
-
-1. `ConvBn2d`: 卷积+批归一化层
-2. `ConvBnReLU2d`: 卷积+批归一化+ReLU激活层
-3. `PoolResBlock`: 池化残差块
-4. `DownResBlock`: 下采样残差块
-5. `ClassifyTailBlock`: 分类尾部块
-6. `LargeKernelClassifierNet`: 主网络架构
 
 ## 环境要求
 
-- Python 3.x
-- PyTorch
+- Python 3.8+
+- PyTorch 2.0+
 - torchvision
-- PIL
+- Pillow
 - matplotlib
+
+## 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+## 配置说明
+
+项目使用 `config.py` 进行统一配置管理，主要包含以下配置项：
+
+### 路径配置
+```python
+# 数据目录配置
+TRAIN_DATA_DIR = "data/train"  # 训练数据目录
+VAL_DATA_DIR = "data/val"      # 验证数据目录
+MODEL_DIR = "models"           # 模型保存目录
+CLASS_INDICES_PATH = "models/class_indices.json"  # 类别索引文件
+```
+
+### 设备配置
+```python
+DEVICE_CONFIG = {
+    'use_mps': True,   # 是否使用 MPS (Apple Silicon GPU)
+    'use_cuda': True,  # 是否使用 CUDA
+    'use_cpu': True    # 是否使用 CPU
+}
+```
+
+### 训练配置
+```python
+TRAINING_CONFIG = {
+    'batch_size': 16,          # 批次大小
+    'num_workers': 4,          # 数据加载线程数
+    'learning_rate': 0.001,    # 学习率
+    'num_epochs': 20,          # 训练轮数
+    'image_size': (128, 256),  # 图像大小
+    'padding': (8, 8),         # 填充大小
+    'fill_color': (255, 255, 255)  # 填充颜色
+}
+```
+
+### 数据转换配置
+```python
+TRANSFORM_CONFIG = {
+    'color_jitter': (0.05, 0.05, 0.05, 0.05),  # 颜色抖动参数
+    'random_horizontal_flip': True,  # 是否随机水平翻转
+    'random_vertical_flip': True     # 是否随机垂直翻转
+}
+```
+
+### 模型保存配置
+```python
+MODEL_SAVE_CONFIG = {
+    'best_model_name': 'best_model.pth',  # 最佳模型文件名
+    'checkpoint_interval': 5              # 检查点保存间隔
+}
+```
 
 ## 使用方法
 
-### 1. 训练模型
+### 训练模型
 
-使用 `test.py` 进行模型训练和测试：
+```bash
+python train.py
+```
+
+### 测试模型
 
 ```bash
 python test.py
 ```
 
-### 2. 预测图像
-
-使用 `predict.py` 进行单张图像的预测：
+### 预测单张图片
 
 ```bash
-python predict.py
+python predict.py path/to/image.jpg path/to/model.pth
 ```
 
-## 数据预处理
+## 模型说明
 
-模型使用的数据预处理包括：
-- 颜色抖动 (ColorJitter)
-- 随机裁剪 (RandomCrop)
-- 随机水平翻转 (RandomHorizontalFlip)
-- 随机垂直翻转 (RandomVerticalFlip)
-- 转换为张量 (ToTensor)
+项目包含三种模型实现：
 
-## 模型特点
-
-1. 轻量级设计：通过优化网络结构，减少参数量
-2. 大卷积核：使用大尺寸卷积核提升特征提取能力
-3. 残差连接：采用多种残差块设计，提升网络性能
-4. 批归一化：使用批归一化加速训练并提高模型稳定性
-5. Dropout：使用Dropout防止过拟合
+1. LightweightClassifierNet：自定义的轻量级CNN模型
+2. GoogLeNet：使用torchvision实现的GoogLeNet模型
+3. ResNet18：使用torchvision实现的ResNet18模型
 
 ## 注意事项
 
 1. 确保数据集按照正确的目录结构组织
-2. 训练前检查GPU可用性
-3. 根据实际需求调整模型参数和训练参数
-4. 注意数据预处理步骤的一致性
+2. 根据实际硬件情况调整 `DEVICE_CONFIG` 配置
+3. 可以根据需要调整 `TRAINING_CONFIG` 中的参数
+4. 模型文件会自动保存在 `models` 目录下
 
 ## 许可证
 
-[待补充]
-
-## 贡献指南
-
-[待补充] 
+MIT License 
