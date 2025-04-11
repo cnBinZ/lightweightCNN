@@ -2,6 +2,7 @@ import torch
 import torchvision.transforms as transforms
 from PIL import Image
 import json
+import os
 from LightweightClassifierNet import LargeKernelClassifierNet
 from config import *  # 导入配置文件
 
@@ -16,14 +17,21 @@ def get_device():
     else:
         raise RuntimeError("No available device found")
 
+def get_transforms():
+    """根据配置创建数据转换"""
+    transform = transforms.Compose([
+        transforms.Resize((TRAINING_CONFIG['image_size'][0] + 32, TRAINING_CONFIG['image_size'][1] + 32)),
+        transforms.CenterCrop(TRAINING_CONFIG['image_size']),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=TRANSFORM_CONFIG['normalize_mean'], 
+                           std=TRANSFORM_CONFIG['normalize_std'])
+    ])
+    return transform
+
 def load_model(model_path):
-    """加载模型和类别索引"""
-    # 加载类别索引
-    with open(CLASS_INDICES_PATH, 'r') as f:
-        class_indices = json.load(f)
-    
+    """加载模型"""
     # 创建模型实例
-    model = LargeKernelClassifierNet(new_resnet=True)
+    model = LargeKernelClassifierNet(new_resnet=True, num_classes=TRAINING_CONFIG['num_classes'])
     
     # 加载模型权重
     device = get_device()
@@ -31,7 +39,7 @@ def load_model(model_path):
     model = model.to(device)
     model.eval()
     
-    return model, class_indices
+    return model
 
 def preprocess_image(image_path):
     """预处理图像"""
@@ -39,48 +47,63 @@ def preprocess_image(image_path):
     image = Image.open(image_path).convert('RGB')
     
     # 应用转换
-    transform = transforms.Compose([
-        transforms.ColorJitter(*TRANSFORM_CONFIG['color_jitter']),
-        transforms.RandomCrop(TRAINING_CONFIG['image_size'], 
-                            padding=TRAINING_CONFIG['padding'], 
-                            fill=TRAINING_CONFIG['fill_color']),
-        transforms.ToTensor()
-    ])
-    
-    # 转换图像
+    transform = get_transforms()
     image_tensor = transform(image)
+    
     return image_tensor.unsqueeze(0)  # 添加批次维度
 
-def predict(model, image_tensor, class_indices):
-    """进行预测"""
+def predict(model, image_tensor, threshold=0.5):
+    """
+    进行预测
+    
+    参数:
+        model: 模型
+        image_tensor: 图像张量
+        threshold: 分类阈值
+    
+    返回:
+        predicted_classes: 预测的类别列表
+        confidences: 对应的置信度列表
+    """
     device = get_device()
     image_tensor = image_tensor.to(device)
     
     with torch.no_grad():
         outputs = model(image_tensor)
-        probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        predicted_class = torch.argmax(probabilities, dim=1).item()
-        confidence = probabilities[0][predicted_class].item()
+        probabilities = torch.sigmoid(outputs)  # 使用sigmoid激活函数进行多标签分类
     
-    # 获取预测的类别名称
-    predicted_class_name = class_indices[str(predicted_class)]
+    # 获取预测的类别和置信度
+    predicted_classes = []
+    confidences = []
     
-    return predicted_class_name, confidence
+    for i, prob in enumerate(probabilities[0]):
+        if prob > threshold:
+            predicted_classes.append(COCO_CLASSES[i])
+            confidences.append(prob.item())
+    
+    # 按置信度排序
+    sorted_indices = sorted(range(len(confidences)), key=lambda i: confidences[i], reverse=True)
+    predicted_classes = [predicted_classes[i] for i in sorted_indices]
+    confidences = [confidences[i] for i in sorted_indices]
+    
+    return predicted_classes, confidences
 
 def main(image_path, model_path):
     """主函数"""
-    # 加载模型和类别索引
-    model, class_indices = load_model(model_path)
+    # 加载模型
+    model = load_model(model_path)
     
     # 预处理图像
     image_tensor = preprocess_image(image_path)
     
     # 进行预测
-    predicted_class, confidence = predict(model, image_tensor, class_indices)
+    predicted_classes, confidences = predict(model, image_tensor)
     
     # 打印结果
-    print(f"Predicted class: {predicted_class}")
-    print(f"Confidence: {confidence:.2%}")
+    print(f"Image: {os.path.basename(image_path)}")
+    print("Predicted classes:")
+    for cls, conf in zip(predicted_classes, confidences):
+        print(f"  - {cls}: {conf:.2%}")
 
 if __name__ == "__main__":
     import sys

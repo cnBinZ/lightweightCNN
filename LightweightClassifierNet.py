@@ -3,20 +3,25 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ConvBn2d(nn.Sequential):
+class ConvBn2d(nn.Module):
     """
-    卷积层+批归一化层的组合
+    卷积+批归一化模块
     参数:
         in_channels: 输入通道数
         out_channels: 输出通道数
-        kernel_size: 卷积核大小，默认为(1,1)
-        stride: 步长，默认为(1,1)
-        padding: 填充大小，默认为(0,0)
+        kernel_size: 卷积核大小
+        stride: 步长
+        padding: 填充
     """
-
-    def __init__(self, in_channels, out_channels, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)):
-        super(ConvBn2d, self).__init__(nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding),
-                                       nn.BatchNorm2d(out_channels))
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0):
+        super(ConvBn2d, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        self.bn = nn.BatchNorm2d(out_channels)
+        
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        return x
 
 
 class ConvBnReLU2d(nn.Sequential):
@@ -123,10 +128,12 @@ class DownResBlock(nn.Module):
     def forward(self, x):
         # 前向传播
         branch0 = self.branch0(x)  # 下采样分支
-        branch1 = self.branch1(x)  # 分支1
+        branch1 = self.branch1(x)  # 分支1F
         branch2 = self.branch2(x)  # 分支2
         # 合并所有分支
-        out = branch0 + self.merge12(branch1 + branch2)
+        merged = self.merge12(branch1 + branch2)
+        merged = F.interpolate(merged, size=branch0.shape[2:], mode='bilinear', align_corners=False)
+        out = merged + branch0
         out = self.relu(out)  # ReLU激活
         out = self.drop(out)  # Dropout
         return out
@@ -160,9 +167,10 @@ class LargeKernelClassifierNet(nn.Module):
     整个网络的主体架构
     参数:
         new_resnet: 是否使用新的ResNet结构
+        num_classes: 输出类别数量
     """
 
-    def __init__(self, new_resnet=False):
+    def __init__(self, new_resnet=False, num_classes=80):
         super(LargeKernelClassifierNet, self).__init__()
         # 数据批归一化
         self.databn = nn.BatchNorm2d(3)  # 输出 256x128
@@ -187,7 +195,7 @@ class LargeKernelClassifierNet(nn.Module):
         self.down4 = DownResBlock(32, 64, 5, new_resnet=new_resnet)  # 输出 16x8
         self.down5 = DownResBlock(64, 128, 5, new_resnet=new_resnet)  # 输出 8x4
         self.down6 = DownResBlock(128, 256, 5, new_resnet=new_resnet)  # 输出 4x2
-        self.tail = ClassifyTailBlock(256, 2)  # 输出 1x1
+        self.tail = ClassifyTailBlock(256, num_classes)  # 输出 1x1
 
     def forward(self, x):
         # 前向传播
@@ -200,5 +208,4 @@ class LargeKernelClassifierNet(nn.Module):
         x = self.down6(x)   # 下采样残差块6
         x = self.tail(x)    # 分类尾部
         x = torch.flatten(x, 1)  # 展平
-        output = F.log_softmax(x, dim=1)  # 对数softmax
-        return output
+        return x  # 直接返回logits，不进行softmax
