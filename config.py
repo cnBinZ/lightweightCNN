@@ -10,8 +10,6 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 数据相关路径
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
-TRAIN_DATA_DIR = os.path.join(DATA_DIR, 'train')
-VAL_DATA_DIR = os.path.join(DATA_DIR, 'val')
 
 # COCO数据集URL
 COCO_URLS = {
@@ -109,24 +107,10 @@ TRANSFORM_CONFIG = {
     'normalize_std': [0.229, 0.224, 0.225]
 }
 
-# 类别索引配置
-CLASS_INDICES = {
-    "0": "class1",
-    "1": "class2",
-    "2": "class3"
-    # 可以根据实际类别添加更多
-}
 
 # 确保必要的目录存在
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(TRAIN_DATA_DIR, exist_ok=True)
-os.makedirs(VAL_DATA_DIR, exist_ok=True)
-
-# 保存类别索引到文件
-CLASS_INDICES_PATH = os.path.join(MODEL_DIR, 'class_indices.json')
-with open(CLASS_INDICES_PATH, 'w') as f:
-    json.dump(CLASS_INDICES, f, indent=4)
 
 # 设备配置
 DEVICE_CONFIG = {
